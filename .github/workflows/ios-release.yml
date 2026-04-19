@@ -97,7 +97,7 @@ jobs:
         env:
           IPA_PATH: "build/ios/ipa/huaxing.ipa"
           APPLE_ID: "ganifatabsar@icloud.com"
-          APP_SPECIFIC_PASSWORD: "nlwp-ncix-xltd-kwsk"
+          APP_SPECIFIC_PASSWORD: "oock-qexf-ixzo-xhkm"
         run: |
           xcrun altool --upload-app -f "$IPA_PATH" \
             -t ios \
