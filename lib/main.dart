@@ -36,7 +36,7 @@ class _HuaxingAppState extends State<HuaxingApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       showPerformanceOverlay: false,
-      title: '画星',
+      title: '花杏',
       theme: buildHuaxingTheme(),
       builder: (BuildContext context, Widget? child) {
         return FeedMuteScope(

@@ -117,7 +117,7 @@ class _FeedTabState extends State<FeedTab> {
             ),
             titlePadding: const EdgeInsets.only(left: 20, bottom: 4),
             title: Text(
-              '花杏摄影',
+              '花杏',
               style: Theme.of(context).appBarTheme.titleTextStyle?.copyWith(
                     fontSize: 22,
                   ),

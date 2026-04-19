@@ -6,6 +6,6 @@ void main() {
   testWidgets('App loads', (WidgetTester tester) async {
     await tester.pumpWidget(const HuaxingApp());
     await tester.pump();
-    expect(find.text('花杏摄影'), findsOneWidget);
+    expect(find.text('花杏'), findsOneWidget);
   });
 }
