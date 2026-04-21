@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload to App Store using altool
         env:
-          IPA_PATH: "build/ios/ipa/huaxing.ipa"
+          IPA_PATH: "build/ios/ipa/花杏.ipa"
           APPLE_ID: "ganifatabsar@icloud.com"
           APP_SPECIFIC_PASSWORD: "oock-qexf-ixzo-xhkm"
         run: |
