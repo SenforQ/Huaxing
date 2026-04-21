@@ -214,8 +214,11 @@ class _FeedTabState extends State<FeedTab> {
                   final bool liked = _likedIds.contains(post.id);
                   final int likeCount =
                       post.likes + (liked ? 1 : 0);
-                  final int commentCount =
-                      _commentsMap[post.id]?.length ?? 0;
+                  final int commentCount = mute
+                      .filterVisibleComments(
+                        _commentsMap[post.id] ?? <FeedComment>[],
+                      )
+                      .length;
                   return Padding(
                     padding: EdgeInsets.only(
                         bottom:

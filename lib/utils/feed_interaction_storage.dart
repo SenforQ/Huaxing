@@ -10,6 +10,53 @@ class FeedInteractionStorage {
   static const String keyLikedPostIds = 'feed_liked_post_ids_v1';
   static const String keyCommentsJson = 'feed_comments_json_v1';
 
+  static const String _builtinCommentPost101Id = 'builtin-lens-101-1';
+
+  static List<FeedComment> _builtinCommentsForPost(String postId) {
+    if (postId == '101') {
+      return <FeedComment>[
+        FeedComment(
+          id: _builtinCommentPost101Id,
+          authorName: '江澄',
+          text: '拍摄很不错！',
+          createdAtMillis: 1713456000000,
+        ),
+      ];
+    }
+    return <FeedComment>[];
+  }
+
+  static Map<String, List<FeedComment>> _mergeBuiltinComments(
+    Map<String, List<FeedComment>> stored,
+  ) {
+    final Map<String, List<FeedComment>> out =
+        <String, List<FeedComment>>{};
+    stored.forEach((String k, List<FeedComment> v) {
+      out[k] = List<FeedComment>.from(v);
+    });
+    final List<String> postIds = <String>{
+      ...out.keys,
+      '101',
+    }.toList();
+    for (final String postId in postIds) {
+      final List<FeedComment> builtin = _builtinCommentsForPost(postId);
+      if (builtin.isEmpty) {
+        continue;
+      }
+      final List<FeedComment> merged =
+          List<FeedComment>.from(out[postId] ?? <FeedComment>[]);
+      final Set<String> ids = merged.map((FeedComment c) => c.id).toSet();
+      for (final FeedComment c in builtin) {
+        if (!ids.contains(c.id)) {
+          merged.insert(0, c);
+          ids.add(c.id);
+        }
+      }
+      out[postId] = merged;
+    }
+    return out;
+  }
+
   static Future<Set<String>> loadLikedPostIds() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? raw = prefs.getString(keyLikedPostIds);
@@ -43,7 +90,7 @@ class FeedInteractionStorage {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? raw = prefs.getString(keyCommentsJson);
     if (raw == null || raw.trim().isEmpty) {
-      return <String, List<FeedComment>>{};
+      return _mergeBuiltinComments(<String, List<FeedComment>>{});
     }
     try {
       final Map<String, dynamic> decoded =
@@ -59,9 +106,9 @@ class FeedInteractionStorage {
               .toList();
         }
       });
-      return out;
+      return _mergeBuiltinComments(out);
     } catch (_) {
-      return <String, List<FeedComment>>{};
+      return _mergeBuiltinComments(<String, List<FeedComment>>{});
     }
   }
 

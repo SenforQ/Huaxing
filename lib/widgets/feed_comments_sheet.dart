@@ -5,9 +5,13 @@ import 'package:path/path.dart' as p;
 
 import '../models/feed_comment.dart';
 import '../models/lens_post.dart';
+import '../pages/user_agreement_page.dart';
+import '../state/feed_mute_controller.dart';
 import '../theme/huaxing_theme.dart';
+import '../utils/comment_user_agreement_storage.dart';
 import '../utils/feed_interaction_storage.dart';
 import '../utils/profile_storage.dart';
+import 'feed_post_more_flow.dart';
 
 String _formatRelativeTime(int millis) {
   final DateTime dt = DateTime.fromMillisecondsSinceEpoch(millis);
@@ -44,7 +48,7 @@ class FeedCommentsSheet extends StatefulWidget {
 class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  List<FeedComment> _items = <FeedComment>[];
+  List<FeedComment> _allComments = <FeedComment>[];
   bool _loading = true;
   String _documentsPath = '';
   String _profileNickname = ProfileStorage.defaultNickname;
@@ -76,6 +80,15 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
     return null;
   }
 
+  bool _isCommentFromOtherUser(FeedComment c) {
+    final String author = c.authorName.trim();
+    final String mine = _profileNickname.trim();
+    if (author.isEmpty || mine.isEmpty) {
+      return author.isNotEmpty && author != mine;
+    }
+    return author != mine;
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -101,7 +114,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
         : state.nickname.trim();
     if (!mounted) return;
     setState(() {
-      _items = list;
+      _allComments = list;
       _documentsPath = doc.path;
       _profileNickname = nick;
       _profileAvatarAbs = abs;
@@ -109,9 +122,161 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
     });
   }
 
+  Future<bool?> _showCommentAgreementGateDialog() async {
+    final BuildContext sheetContext = context;
+    bool checked = false;
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (BuildContext _, void Function(void Function()) setLocal) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF2C2C2E),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              title: Text(
+                '发表评论前请确认',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.96),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '为保护社区环境，发表评论前请阅读并同意遵守《用户协议》。不同意则无法发布评论。',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.78),
+                        fontSize: 15,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.of(sheetContext).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (BuildContext context) =>
+                                  const UserAgreementPage(),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: kAccentYellow,
+                          padding: EdgeInsets.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          '查看完整用户协议',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Checkbox(
+                            value: checked,
+                            onChanged: (bool? v) {
+                              setLocal(() => checked = v ?? false);
+                            },
+                            activeColor: kAccentYellow,
+                            checkColor: Colors.black,
+                            side: BorderSide(
+                              color: Colors.white.withOpacity(0.45),
+                            ),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setLocal(() => checked = !checked),
+                              behavior: HitTestBehavior.opaque,
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: Text(
+                                  '我已阅读《用户协议》，并同意在发表评论时遵守其中约定（包括不得发布违法、侵权、骚扰、低俗等不良信息）。',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.88),
+                                    fontSize: 14,
+                                    height: 1.42,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text(
+                    '取消',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.65),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                FilledButton(
+                  onPressed: checked
+                      ? () => Navigator.of(dialogContext).pop(true)
+                      : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kAccentYellow,
+                    foregroundColor: Colors.black,
+                    disabledBackgroundColor:
+                        Colors.white.withOpacity(0.12),
+                    disabledForegroundColor:
+                        Colors.white.withOpacity(0.35),
+                  ),
+                  child: const Text(
+                    '同意并发送',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _send() async {
     final String text = _controller.text.trim();
     if (text.isEmpty) return;
+
+    final bool agreedStored =
+        await CommentUserAgreementStorage.hasAccepted();
+    if (!agreedStored) {
+      final bool? agreed = await _showCommentAgreementGateDialog();
+      if (agreed != true) {
+        return;
+      }
+      await CommentUserAgreementStorage.setAccepted(true);
+    }
+
     final ProfileEditState profile = await ProfileStorage.load();
     final String nick = profile.nickname.trim().isEmpty
         ? ProfileStorage.defaultNickname
@@ -136,6 +301,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    FeedMuteScope.of(context);
     return SizedBox.expand(
       child: DraggableScrollableSheet(
         expand: false,
@@ -143,6 +309,9 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
         minChildSize: 0.38,
         maxChildSize: 0.94,
         builder: (BuildContext context, ScrollController scrollController) {
+          final FeedMuteController mute = FeedMuteScope.of(context);
+          final List<FeedComment> visibleComments =
+              mute.filterVisibleComments(_allComments);
           return DecoratedBox(
             decoration: const BoxDecoration(
               color: Color(0xFF2C2C2E),
@@ -198,7 +367,7 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                           child:
                               CircularProgressIndicator(color: kAccentYellow),
                         )
-                      : _items.isEmpty
+                      : visibleComments.isEmpty
                           ? Center(
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -238,14 +407,14 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                               controller: scrollController,
                               padding: const EdgeInsets.fromLTRB(
                                   16, 12, 16, 12),
-                              itemCount: _items.length,
+                              itemCount: visibleComments.length,
                               separatorBuilder: (_, __) => Divider(
                                 height: 20,
                                 thickness: 0.5,
                                 color: Colors.white.withOpacity(0.08),
                               ),
                               itemBuilder: (BuildContext context, int index) {
-                                final FeedComment c = _items[index];
+                                final FeedComment c = visibleComments[index];
                                 return Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -262,16 +431,47 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
                                         children: [
                                           Row(
                                             crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                                CrossAxisAlignment.center,
                                             children: [
                                               Expanded(
-                                                child: Text(
-                                                  c.authorName,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 15,
-                                                  ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Flexible(
+                                                      child: Text(
+                                                        c.authorName,
+                                                        maxLines: 1,
+                                                        overflow:
+                                                            TextOverflow.ellipsis,
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          fontSize: 15,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (_isCommentFromOtherUser(
+                                                        c)) ...[
+                                                      const SizedBox(width: 6),
+                                                      _OtherUserCommentBadge(
+                                                        onTap: () {
+                                                          FeedPostMoreFlow
+                                                              .openCommentAuthorActions(
+                                                            context,
+                                                            widget.post,
+                                                            c,
+                                                            onCommentsDataRefresh:
+                                                                () {
+                                                              widget
+                                                                  .onCommentsUpdated();
+                                                              _reload();
+                                                            },
+                                                          );
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ],
                                                 ),
                                               ),
                                               Text(
@@ -380,6 +580,44 @@ class _FeedCommentsSheetState extends State<FeedCommentsSheet> {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _OtherUserCommentBadge extends StatelessWidget {
+  const _OtherUserCommentBadge({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: kAccentYellow,
+            ),
+            child: Center(
+              child: Text(
+                '!',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

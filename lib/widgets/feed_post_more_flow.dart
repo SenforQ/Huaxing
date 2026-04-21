@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../data/lens_feed.dart';
+import '../models/feed_comment.dart';
 import '../models/lens_post.dart';
 import '../pages/report_page.dart';
 import '../state/feed_mute_controller.dart';
@@ -11,14 +12,29 @@ import '../state/feed_mute_controller.dart';
 class FeedPostMoreFlow {
   FeedPostMoreFlow._();
 
-  /// 跳转举报页。
+  /// 跳转举报页（被举报对象为动态作者）。
   static void startReport(BuildContext context, LensPost post) {
+    startReportWithTarget(
+      context,
+      postId: post.id,
+      userName: post.userName,
+      previewCaption: post.caption,
+    );
+  }
+
+  /// 跳转举报页（可指定被举报用户，例如评论者）。
+  static void startReportWithTarget(
+    BuildContext context, {
+    required String postId,
+    required String userName,
+    String? previewCaption,
+  }) {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (BuildContext context) => ReportPage(
-          postId: post.id,
-          userName: post.userName,
-          previewCaption: post.caption,
+          postId: postId,
+          userName: userName,
+          previewCaption: previewCaption,
         ),
       ),
     );
@@ -27,8 +43,14 @@ class FeedPostMoreFlow {
   /// 拉黑作者并回到根视图（主页 Tab）。
   static Future<void> blockAndReturnToRoot(
       BuildContext context, LensPost post) async {
+    await blockUserByNameAndReturnToRoot(context, post.userName);
+  }
+
+  /// 按用户名拉黑并回到根视图。
+  static Future<void> blockUserByNameAndReturnToRoot(
+      BuildContext context, String userName) async {
     final FeedMuteController mute = FeedMuteScope.of(context);
-    await mute.blockUser(post.userName);
+    await mute.blockUser(userName.trim());
     if (!context.mounted) return;
     Navigator.of(context, rootNavigator: true)
         .popUntil((Route<dynamic> r) => r.isFirst);
@@ -88,6 +110,73 @@ class FeedPostMoreFlow {
               await hideAndReturnToRoot(context, post);
             },
             child: const Text('屏蔽此动态'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('取消'),
+        ),
+      ),
+    );
+  }
+
+  /// 评论列表中「其他用户」标记：拉黑、屏蔽此动态、举报。  
+  /// [onCommentsDataRefresh]：拉黑或屏蔽后用于重新拉取评论区数据并刷新 Feed 评论数。
+  static Future<void> openCommentAuthorActions(
+    BuildContext context,
+    LensPost post,
+    FeedComment comment, {
+    VoidCallback? onCommentsDataRefresh,
+  }) async {
+    final String name = comment.authorName.trim();
+    if (name.isEmpty) {
+      return;
+    }
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (BuildContext ctx) => CupertinoActionSheet(
+        title: Text('「$name」'),
+        message: const Text('请选择操作'),
+        actions: [
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final FeedMuteController mute = FeedMuteScope.of(context);
+              await mute.blockUser(name);
+              if (!context.mounted) {
+                return;
+              }
+              onCommentsDataRefresh?.call();
+            },
+            child: Text('拉黑「$name」'),
+          ),
+          CupertinoActionSheetAction(
+            isDestructiveAction: true,
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final FeedMuteController mute = FeedMuteScope.of(context);
+              await mute.hidePost(post.id);
+              if (!context.mounted) {
+                return;
+              }
+              onCommentsDataRefresh?.call();
+              Navigator.of(context, rootNavigator: true)
+                  .popUntil((Route<dynamic> r) => r.isFirst);
+            },
+            child: const Text('屏蔽此动态'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              startReportWithTarget(
+                context,
+                postId: post.id,
+                userName: name,
+                previewCaption: comment.text,
+              );
+            },
+            child: const Text('举报'),
           ),
         ],
         cancelButton: CupertinoActionSheetAction(

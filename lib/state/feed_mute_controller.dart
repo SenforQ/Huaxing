@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../models/feed_comment.dart';
 import '../utils/social_block_storage.dart';
 
 class FeedMuteController extends ChangeNotifier {
@@ -34,6 +35,16 @@ class FeedMuteController extends ChangeNotifier {
         .where((T p) =>
             !blockedUserNames.contains(userNameOf(p)) &&
             !hiddenPostIds.contains(idOf(p)))
+        .toList();
+  }
+
+  /// 评论区展示：排除已拉黑用户的评论（存储仍保留，仅 UI 过滤）。
+  List<FeedComment> filterVisibleComments(List<FeedComment> source) {
+    return source
+        .where(
+          (FeedComment c) =>
+              !blockedUserNames.contains(c.authorName.trim()),
+        )
         .toList();
   }
 }
